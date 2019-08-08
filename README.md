@@ -1,3 +1,6 @@
+# Make sure you have a GCC cross-compiler for ARM installed.  On Ubuntu:
+apt install gcc-arm-none-eabi
+
 # Make sure you have a copy of the GreatFET repo:
 git clone --recurse-submodules https://github.com/greatscottgadgets/greatfet.git
 

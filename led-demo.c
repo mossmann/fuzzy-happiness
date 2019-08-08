@@ -12,6 +12,17 @@
 /* length of SPI buffer: (start frame + number of leds) * 4 bytes per frame */
 #define BLEN ((1 + LEN) * 4)
 
+/* 'shellie' in morse code */
+const uint8_t code[] = {
+	1, 0, 1, 0, 1, 0, 0, 0,             // S ...
+	1, 0, 1, 0, 1, 0, 1, 0, 0, 0,       // H ....
+	1, 0, 0, 0,                         // E .
+	1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, // L .-..
+	1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, // L .-..
+	1, 0, 1, 0, 0, 0,                   // I ..
+	1, 0, 0, 0,                         // E .
+};
+
 uint8_t spi_buffer[BLEN];
 
 static struct gpio_t dfu_button = GPIO(5, 7);
@@ -54,6 +65,29 @@ void set_led(uint8_t index, uint8_t red, uint8_t green, uint8_t blue, uint8_t br
 		spi_buffer[4*(index+1)+1] = blue;
 		spi_buffer[4*(index+1)+2] = green;
 		spi_buffer[4*(index+1)+3] = red;
+	}
+}
+
+void name_tag() {
+	uint32_t i, j;
+	uint8_t brightness = 1;
+
+	while(1) {
+		for(j = 0; LEN > j; j++){
+			write_start_frame();
+			for(i = 0; LEN > i; i++){
+				if(code[(i+j) % LEN]) {
+					set_led(i, 0, 0, 0xff, brightness);
+				} else {
+					set_led(i, 0, 0, 0, 0);
+				}
+			}
+			spi_bus_transfer(&spi1_target, spi_buffer, BLEN);
+			long_delay(100);
+			if(gpio_read(&dfu_button)) {
+				return;
+			}
+		}
 	}
 }
 
@@ -170,6 +204,7 @@ int main(void)
 	spi1_init(spi1_target_drv.target);
 
 	while(1){
+		name_tag();
 		purple_pulse();
 		green_chase();
 		rainbow();
