@@ -1,14 +1,16 @@
+/* light show for APA102 RGB LED strip */
+
 #include "greatfet_core.h"
 #include <spi_bus.h>
 #include <pins.h>
 #include <math.h>
 #include <stdlib.h>
 
-/* length of LED string */
+/* number of LEDs in LED strip */
 #define LEN (56)
 
-/* length of buffer (56 leds + start frame) */
-#define BLEN ((LEN + 1) * 4)
+/* length of SPI buffer: (start frame + number of leds) * 4 bytes per frame */
+#define BLEN ((1 + LEN) * 4)
 
 uint8_t spi_buffer[BLEN];
 
@@ -34,7 +36,7 @@ static spiflash_driver_t spi1_target_drv = {
 
 void long_delay(const uint32_t duration) {
 	uint32_t i;
-	for(i = 0; i < duration; i++){
+	for(i = 0; duration > i; i++){
 		delay(65535);
 	}
 }
@@ -46,37 +48,38 @@ void write_start_frame() {
 	spi_buffer[3] = 0;
 }
 
+void set_led(uint8_t index, uint8_t red, uint8_t green, uint8_t blue, uint8_t brightness) {
+	if(LEN > index) {
+		spi_buffer[4*(index+1)] = 0xe0 | (brightness & 0x1f);
+		spi_buffer[4*(index+1)+1] = blue;
+		spi_buffer[4*(index+1)+2] = green;
+		spi_buffer[4*(index+1)+3] = red;
+	}
+}
+
 void purple_pulse() {
 	uint32_t i;
 	uint8_t brightness = 1;
 	uint8_t phase = 0;
 
 	while(1) {
-		for(phase = 1; phase < 255; phase++) {
+		for(phase = 1; 255 > phase; phase++) {
 			write_start_frame();
-			for(i = 4; i < BLEN; i+=4){
-				spi_buffer[i] = 0xe0 | (brightness & 0x1f);
-				spi_buffer[i+1] = phase; //blue
-				spi_buffer[i+2] = 0; //green
-				spi_buffer[i+3] = phase; //red
+			for(i = 0; i < LEN; i++){
+				set_led(i, phase, 0, phase, brightness);
 			}
 			spi_bus_transfer(&spi1_target, spi_buffer, BLEN);
-			//delay(65535);
 			long_delay(64/phase);
 		}
 		if(gpio_read(&dfu_button)) {
 			break;
 		}
-		for(phase = 255; phase > 1; phase--) {
+		for(phase = 255; 1 < phase; phase--) {
 			write_start_frame();
-			for(i = 4; i < BLEN; i+=4){
-				spi_buffer[i] = 0xe0 | (brightness & 0x1f);
-				spi_buffer[i+1] = phase; //blue
-				spi_buffer[i+2] = 0; //green
-				spi_buffer[i+3] = phase; //red
+			for(i = 0; LEN > i; i++){
+				set_led(i, phase, 0, phase, brightness);
 			}
 			spi_bus_transfer(&spi1_target, spi_buffer, BLEN);
-			//delay(65535);
 			long_delay(64/phase);
 		}
 		if(gpio_read(&dfu_button)) {
@@ -90,18 +93,13 @@ void green_chase() {
 	uint8_t brightness = 1;
 
 	while(1) {
-		for(j = 0; j < LEN; j++){
+		for(j = 0; LEN > j; j++){
 			write_start_frame();
-			for(i = 0; i < LEN; i++){
-				spi_buffer[4*(i+1)] = 0xe0 | (brightness & 0x1f);
+			for(i = 0; LEN > i; i++){
 				if(i == j) {
-					spi_buffer[4*(i+1)+1] = 0; //blue
-					spi_buffer[4*(i+1)+2] = 0xff; //green
-					spi_buffer[4*(i+1)+3] = 0; //red
+					set_led(i, 0, 0xff, 0, brightness);
 				} else {
-					spi_buffer[4*(i+1)+1] = 0; //blue
-					spi_buffer[4*(i+1)+2] = 0; //green
-					spi_buffer[4*(i+1)+3] = 0; //red
+					set_led(i, 0, 0, 0, 0);
 				}
 			}
 			spi_bus_transfer(&spi1_target, spi_buffer, BLEN);
@@ -117,27 +115,22 @@ void sparkle() {
 	uint32_t i;
 	uint8_t brightness = 1;
 	uint8_t active_led = 0;
-	uint8_t count = 1;
+	uint8_t button_delay = 1;
 
 	while(1) {
 		active_led += rand();
 		active_led %= LEN;
 		write_start_frame();
-		for(i = 0; i < LEN; i++){
-			spi_buffer[4*(i+1)] = 0xe0 | (brightness & 0x1f);
+		for(i = 0; LEN > i; i++){
 			if(i == active_led) {
-				spi_buffer[4*(i+1)+1] = 0; //blue
-				spi_buffer[4*(i+1)+2] = 0xff; //green
-				spi_buffer[4*(i+1)+3] = 0xff; //red
+				set_led(i, 0xff, 0xff, 0, brightness);
 			} else {
-				spi_buffer[4*(i+1)+1] = 0; //blue
-				spi_buffer[4*(i+1)+2] = 0; //green
-				spi_buffer[4*(i+1)+3] = 0; //red
+				set_led(i, 0, 0, 0, 0);
 			}
 		}
 		spi_bus_transfer(&spi1_target, spi_buffer, BLEN);
 		long_delay(2);
-		if(!count++ && gpio_read(&dfu_button)) {
+		if(!button_delay++ && gpio_read(&dfu_button)) {
 			break;
 		}
 	}
@@ -148,13 +141,10 @@ void rainbow() {
 	uint8_t brightness = 1;
 
 	while(1) {
-		for(j = 0; j < LEN; j++){
+		for(j = 0; LEN > j; j++){
 			write_start_frame();
-			for(i = 0; i < LEN; i++){
-				spi_buffer[4*(i+1)] = 0xe0 | (brightness & 0x1f);
-				spi_buffer[4*(i+1)+1] = ((j+i) % LEN); //blue
-				spi_buffer[4*(i+1)+2] = ((j+i+19) % LEN); //green
-				spi_buffer[4*(i+1)+3] = ((j+i+37) % LEN); //red
+			for(i = 0; LEN > i; i++){
+				set_led(i, (j+i+37) % LEN, (j+i+19) % LEN, (j+i) % LEN, brightness);
 			}
 			spi_bus_transfer(&spi1_target, spi_buffer, BLEN);
 			long_delay(10);
