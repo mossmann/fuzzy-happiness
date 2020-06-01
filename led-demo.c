@@ -28,7 +28,7 @@ uint8_t spi_buffer[BLEN];
 static struct gpio_t dfu_button = GPIO(5, 7);
 
 static spi_target_t spi1_target = {
-        .bus = &spi_bus_ssp1,
+	.bus = &spi_bus_ssp1,
 };
 
 void spi1_init(spi_target_t* const target) {
@@ -198,7 +198,7 @@ int main(void)
 	scu_pinmux(SCU_PINMUX_BOOT2, SCU_GPIO_FAST | SCU_CONF_FUNCTION0);
 	gpio_input(&dfu_button);
 
-        ssp_config_t *config;
+	ssp_config_t *config;
 	config = (ssp_config_t *)&ssp1_config_spi;
 	spi_bus_start(spi1_target_drv.target, config);
 	spi1_init(spi1_target_drv.target);
